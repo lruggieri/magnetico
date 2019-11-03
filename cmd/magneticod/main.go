@@ -117,10 +117,11 @@ func main() {
 
 		case md := <-metadataSink.Drain():
 			if err := database.AddNewTorrent(md.InfoHash, md.Name, md.Files); err != nil {
-				zap.L().Fatal("Could not add new torrent to the database",
+				zap.L().Error("Could not add new torrent to the database",
 					util.HexField("infohash", md.InfoHash), zap.Error(err))
+			}else{
+				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash))
 			}
-			zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash))
 
 		case <-interruptChan:
 			trawlingManager.Terminate()

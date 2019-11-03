@@ -55,17 +55,23 @@ func (s *beanstalkd) DoesTorrentExist(infoHash []byte) (bool, error) {
 }
 
 func (s *beanstalkd) AddNewTorrent(infoHash []byte, name string, files []File) error {
-	payloadJson, err := json.Marshal(SimpleTorrentSummary{
+
+	sts := SimpleTorrentSummary{
 		InfoHash: hex.EncodeToString(infoHash),
 		Name:     name,
 		Files:    files,
+	}
+	payloadJson, err := json.Marshal(ExpandedTorrentSummary{
+		SimpleTorrentSummary: &sts,
+		TotalSize:sts.GetTotalSize(),
+		LastDiscovered:time.Now().Unix(),
 	})
 
 	if err != nil {
 		return errors.Wrap(err, "DB engine beanstalkd encode error")
 	}
 
-	jobId, err := s.bsQueue.Put(payloadJson, 0, 0, 30*time.Second)
+	jobId, err := s.bsQueue.Put(payloadJson, 0, 0, 30 * time.Second)
 
 	if err != nil {
 		return errors.Wrap(err, "DB engine beanstalkd Put() error")
