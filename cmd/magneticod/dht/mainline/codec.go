@@ -66,7 +66,7 @@ type QueryArguments struct {
 	//   - `BFpe`: Bloom Filter (256 bytes) representing all stored peers (leeches) for that
 	//             infohash
 	// Defined in BEP 33 "DHT Scrapes" for `get_peers` queries.
-	Scrape int `bencode:"noseed,omitempty"`
+	Scrape int `bencode:"scrape,omitempty"`
 }
 
 type ResponseValues struct {

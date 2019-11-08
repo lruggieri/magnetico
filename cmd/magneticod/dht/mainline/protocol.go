@@ -184,6 +184,7 @@ func (p *Protocol) printStats() {
 func (p *Protocol) onMessage(msg *Message, addr *net.UDPAddr) {
 	temporaryQ := msg.Q
 
+
 	switch msg.Y {
 	case "q":
 		switch msg.Q {
@@ -328,6 +329,7 @@ func NewFindNodeQuery(id []byte, target []byte) *Message {
 		A: QueryArguments{
 			ID:     id,
 			Target: target,
+			//Scrape:1, //doesn't seem to change much
 		},
 	}
 }
@@ -340,6 +342,7 @@ func NewGetPeersQuery(id []byte, infoHash []byte) *Message {
 		A: QueryArguments{
 			ID:       id,
 			InfoHash: infoHash,
+			//Scrape:1, //doesn't seem to change much
 		},
 	}
 }

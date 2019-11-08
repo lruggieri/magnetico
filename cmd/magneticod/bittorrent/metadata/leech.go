@@ -316,6 +316,8 @@ func (l *Leech) Do(deadline time.Time) {
 		return
 	}
 
+
+
 	for l.metadataReceived < l.metadataSize {
 		rUmMessage, err := l.readUmMessage()
 		if err != nil {
@@ -420,6 +422,8 @@ func (l *Leech) Do(deadline time.Time) {
 
 		totalSize += uint64(file.Size)
 	}
+
+	//fmt.Println("FROM",l.peerAddr,"HASH",string(hex.EncodeToString(l.infoHash[:])))
 
 	l.ev.OnSuccess(Metadata{
 		InfoHash:     l.infoHash[:],

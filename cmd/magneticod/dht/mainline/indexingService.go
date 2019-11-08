@@ -1,6 +1,8 @@
 package mainline
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"math/rand"
 	"net"
 	"strconv"
@@ -13,6 +15,21 @@ import (
 var (
 	StatsPrintClock = 10 * time.Second
 )
+
+type Infohash [20]byte
+func (ih *Infohash) String() string{
+	return hex.EncodeToString(ih[:])
+}
+func StringToInfohash(iInfohashString string) (oInfohash Infohash, oErr error){
+	hashToLookFor, err := hex.DecodeString(iInfohashString)
+	if err != nil{
+		return Infohash{},err
+	}
+	var infohash Infohash
+	copy(infohash[:],hashToLookFor)
+	return infohash,nil
+}
+
 
 type IndexingService struct {
 	// Private
@@ -32,6 +49,9 @@ type IndexingService struct {
 
 	counter          uint16
 	getPeersRequests map[[2]byte][20]byte // GetPeersQuery.`t` -> infohash
+
+
+	infohashPeersAssociation map[Infohash]map[string]bool //Infohash => PeersAddresses(in string form)
 }
 
 type IndexingServiceEventHandlers struct {
@@ -203,6 +223,8 @@ func (is *IndexingService) onGetPeersResponse(msg *Message, addr *net.UDPAddr) {
 	//     concatenated infohashes (20 bytes each) FOR WHICH IT HOLDS GET_PEERS VALUES.
 	//                                                                          ^^^^^^
 	// So theoretically we should never hit the case where `values` is empty, but c'est la vie.
+	// BUT! If we shot a get peers query to a host with a specific infohash just to fetch information about it...most
+	// of the times it will be empty
 	if len(msg.R.Values) == 0 {
 		return
 	}
@@ -234,7 +256,6 @@ func (is *IndexingService) onSampleInfohashesResponse(msg *Message, addr *net.UD
 		msg := NewGetPeersQuery(is.nodeID, infoHash[:])
 		t := uint16BE(is.counter)
 		msg.T = t[:]
-
 		is.protocol.SendMessage(msg, addr)
 
 		is.getPeersRequests[t] = infoHash
@@ -271,5 +292,9 @@ func (is *IndexingService) onSampleInfohashesResponse(msg *Message, addr *net.UD
 func uint16BE(v uint16) (b [2]byte) {
 	b[0] = byte(v >> 8)
 	b[1] = byte(v)
+	return
+}
+func beUint16(b [2]byte) (v uint16) {
+	v = binary.BigEndian.Uint16(b[:])
 	return
 }
