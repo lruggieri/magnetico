@@ -34,7 +34,7 @@ func (s *stdout) DoesTorrentExist(infoHash []byte) (bool, error) {
 	return false, nil
 }
 
-func (s *stdout) AddNewTorrent(infoHash []byte, name string, files []File) error {
+func (s *stdout) AddNewTorrent(infoHash []byte, name string, files []File, totalPeers int) error {
 	err := s.encoder.Encode(SimpleTorrentSummary{
 		InfoHash: hex.EncodeToString(infoHash),
 		Name:     name,

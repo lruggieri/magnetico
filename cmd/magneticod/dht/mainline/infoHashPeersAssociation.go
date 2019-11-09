@@ -1,8 +1,18 @@
 package mainline
 
 import (
+	"go.uber.org/zap"
 	"sync"
 	"time"
+)
+
+const(
+	CheckTooOldLoopTickTime = time.Hour
+)
+
+var(
+	//MaxPeerLife is the max life time of a peer for a specific hash
+	MaxPeerLife = 2*24*time.Hour
 )
 
 type peerAddressLastSeen map[string]int64 //peerAddress => last seenTime
@@ -31,11 +41,38 @@ func (ipa *infohashPeersAssociation) GetPeers(iInfohash Infohash) peerAddressLas
 	}
 	return nil
 }
-
+func (ipa *infohashPeersAssociation) DeleteTooOld(){
+	ipa.Lock()
+	defer ipa.Unlock()
+	for infohash,peers := range ipa.association{
+		for addr,lastSeen := range peers{
+			if lastSeen < time.Now().Add(-MaxPeerLife).UnixNano(){
+				delete(peers,addr)
+			}
+		}
+		if len(peers) == 0{
+			delete(ipa.association,infohash)
+		}
+	}
+}
+func (ipa *infohashPeersAssociation) StartTooOldLoop(){
+	for{
+		select {
+		case <- time.Tick(CheckTooOldLoopTickTime):{
+			zap.L().Info("Checking too old infohash-peers associations")
+			ipa.DeleteTooOld()
+		}
+		}
+	}
+}
 
 
 func NewInfoHashPeersAssociation() *infohashPeersAssociation{
-	return &infohashPeersAssociation{
+	newIpa := &infohashPeersAssociation{
 		association: make(map[Infohash]peerAddressLastSeen),
 	}
+
+	go newIpa.StartTooOldLoop()
+
+	return newIpa
 }

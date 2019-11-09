@@ -16,10 +16,7 @@ var (
 	StatsPrintClock = 10 * time.Second
 )
 
-type Infohash [20]byte
-func (ih *Infohash) String() string{
-	return hex.EncodeToString(ih[:])
-}
+
 func StringToInfohash(iInfohashString string) (oInfohash Infohash, oErr error){
 	hashToLookFor, err := hex.DecodeString(iInfohashString)
 	if err != nil{
@@ -51,7 +48,7 @@ type IndexingService struct {
 	getPeersRequests map[[2]byte][20]byte // GetPeersQuery.`t` -> infohash
 
 
-	infohashPeersAssociation map[Infohash]map[string]bool //Infohash => PeersAddresses(in string form)
+	infohashPeersAssociation *infohashPeersAssociation
 }
 
 type IndexingServiceEventHandlers struct {
@@ -61,14 +58,16 @@ type IndexingServiceEventHandlers struct {
 type IndexingResult struct {
 	infoHash  [20]byte
 	peerAddrs []net.TCPAddr
+	currentTotalPeers int
 }
-
 func (ir IndexingResult) InfoHash() [20]byte {
 	return ir.infoHash
 }
-
 func (ir IndexingResult) PeerAddrs() []net.TCPAddr {
 	return ir.peerAddrs
+}
+func (ir IndexingResult) CurrentTotalPeers() int {
+	return ir.currentTotalPeers
 }
 
 func NewIndexingService(laddr string, interval time.Duration, maxNeighbors uint, eventHandlers IndexingServiceEventHandlers) *IndexingService {
@@ -88,6 +87,8 @@ func NewIndexingService(laddr string, interval time.Duration, maxNeighbors uint,
 	service.eventHandlers = eventHandlers
 
 	service.getPeersRequests = make(map[[2]byte][20]byte)
+
+	service.infohashPeersAssociation = NewInfoHashPeersAssociation()
 
 	return service
 }
@@ -230,20 +231,30 @@ func (is *IndexingService) onGetPeersResponse(msg *Message, addr *net.UDPAddr) {
 	}
 
 	peerAddrs := make([]net.TCPAddr, 0)
+	is.infohashPeersAssociation.Add(infoHash,addr.String())
 	for _, peer := range msg.R.Values {
 		if peer.Port == 0 {
 			continue
 		}
 
-		peerAddrs = append(peerAddrs, net.TCPAddr{
+		tcpAddr := net.TCPAddr{
 			IP:   peer.IP,
 			Port: peer.Port,
-		})
+		}
+		is.infohashPeersAssociation.Add(infoHash, tcpAddr.String())
+		peerAddrs = append(peerAddrs, tcpAddr)
+	}
+
+	currentTotalPeers := is.infohashPeersAssociation.GetPeers(infoHash)
+	currentTotalPeersLen := 0
+	if currentTotalPeers != nil{
+		currentTotalPeersLen = len(currentTotalPeers)
 	}
 
 	is.eventHandlers.OnResult(IndexingResult{
 		infoHash:  infoHash,
 		peerAddrs: peerAddrs,
+		currentTotalPeers: currentTotalPeersLen,
 	})
 }
 

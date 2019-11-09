@@ -67,7 +67,7 @@ func TestInfohashPeersAssociation_Add(t *testing.T) {
 		ih,_ = StringToInfohash(newInfoHash)
 		ipa.Add(ih, newAddr.String())
 	}
-	if len(ipa.association) != itemsToInsert{
+	if len(ipa.association)-1 != itemsToInsert{
 		t.Error("expecting to see exactly",itemsToInsert,"infohash inserted. Found",len(ipa.association))
 		t.FailNow()
 	}

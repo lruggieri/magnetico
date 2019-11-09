@@ -106,7 +106,6 @@ func main() {
 		select {
 		case result := <-trawlingManager.Output():
 			infoHash := result.InfoHash()
-
 			zap.L().Debug("Trawled!", util.HexField("infoHash", infoHash[:]))
 			exists, err := database.DoesTorrentExist(infoHash[:])
 			if err != nil {
@@ -116,11 +115,11 @@ func main() {
 			}
 
 		case md := <-metadataSink.Drain():
-			if err := database.AddNewTorrent(md.InfoHash, md.Name, md.Files); err != nil {
+			if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.CurrentTotalPeers); err != nil {
 				zap.L().Error("Could not add new torrent to the database",
-					util.HexField("infohash", md.InfoHash), zap.Error(err))
+					util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
 			}else{
-				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash))
+				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
 			}
 
 		case <-interruptChan:

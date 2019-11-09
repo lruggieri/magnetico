@@ -38,6 +38,7 @@ type extDict struct {
 type Leech struct {
 	infoHash [20]byte
 	peerAddr *net.TCPAddr
+	currentTotalPeers int
 	ev       LeechEventHandlers
 
 	conn     *net.TCPConn
@@ -55,10 +56,11 @@ type LeechEventHandlers struct {
 	OnError   func([20]byte, error) // must be supplied. args: infohash, error
 }
 
-func NewLeech(infoHash [20]byte, peerAddr *net.TCPAddr, clientID []byte, ev LeechEventHandlers) *Leech {
+func NewLeech(infoHash [20]byte, peerAddr *net.TCPAddr, currentTotalPeers int,clientID []byte, ev LeechEventHandlers) *Leech {
 	l := new(Leech)
 	l.infoHash = infoHash
 	l.peerAddr = peerAddr
+	l.currentTotalPeers = currentTotalPeers
 	copy(l.clientID[:], clientID)
 	l.ev = ev
 
@@ -426,8 +428,9 @@ func (l *Leech) Do(deadline time.Time) {
 	//fmt.Println("FROM",l.peerAddr,"HASH",string(hex.EncodeToString(l.infoHash[:])))
 
 	l.ev.OnSuccess(Metadata{
-		InfoHash:     l.infoHash[:],
+		InfoHash:     l.infoHash,
 		Name:         info.Name,
+		CurrentTotalPeers:l.currentTotalPeers,
 		TotalSize:    totalSize,
 		DiscoveredOn: time.Now().Unix(),
 		Files:        files,

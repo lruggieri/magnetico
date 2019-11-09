@@ -93,7 +93,7 @@ func (db *sqlite3Database) DoesTorrentExist(infoHash []byte) (bool, error) {
 	return exists, nil
 }
 
-func (db *sqlite3Database) AddNewTorrent(infoHash []byte, name string, files []File) error {
+func (db *sqlite3Database) AddNewTorrent(infoHash []byte, name string, files []File, totalPeers int) error {
 	tx, err := db.conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, "conn.Begin")

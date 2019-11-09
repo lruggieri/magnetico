@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"github.com/boramalper/magnetico/cmd/magneticod/dht/mainline"
 	"math/rand"
 	"net"
 	"sync"
@@ -14,7 +15,7 @@ import (
 )
 
 type Metadata struct {
-	InfoHash []byte
+	InfoHash mainline.Infohash
 	// Name should be thought of "Title" of the torrent. For single-file torrents, it is the name
 	// of the file, and for multi-file torrents, it is the name of the root directory.
 	Name         string
@@ -22,6 +23,13 @@ type Metadata struct {
 	DiscoveredOn int64
 	// Files must be populated for both single-file and multi-file torrents!
 	Files []persistence.File
+
+	CurrentTotalPeers int
+}
+
+type InfoHashToSink struct{
+	addresses []net.TCPAddr
+	currentTotalPeers int
 }
 
 type Sink struct {
@@ -30,7 +38,7 @@ type Sink struct {
 	maxNLeeches int
 	drain       chan Metadata
 
-	incomingInfoHashes   map[[20]byte][]net.TCPAddr
+	incomingInfoHashes   map[mainline.Infohash]*InfoHashToSink
 	incomingInfoHashesMx sync.Mutex
 
 	terminated  bool
@@ -80,7 +88,7 @@ func NewSink(deadline time.Duration, maxNLeeches int) *Sink {
 	ms.deadline = deadline
 	ms.maxNLeeches = maxNLeeches
 	ms.drain = make(chan Metadata, 10)
-	ms.incomingInfoHashes = make(map[[20]byte][]net.TCPAddr)
+	ms.incomingInfoHashes = make(map[mainline.Infohash]*InfoHashToSink)
 	ms.termination = make(chan interface{})
 
 	go func() {
@@ -114,14 +122,18 @@ func (ms *Sink) Sink(res dht.Result) {
 
 	infoHash := res.InfoHash()
 	peerAddrs := res.PeerAddrs()
+	currentTotalPeers := res.CurrentTotalPeers()
 
 	if _, exists := ms.incomingInfoHashes[infoHash]; exists {
 		return
 	} else if len(peerAddrs) > 0 {
 		peer := peerAddrs[0]
-		ms.incomingInfoHashes[infoHash] = peerAddrs[1:]
+		ms.incomingInfoHashes[infoHash] = &InfoHashToSink{
+			addresses:peerAddrs[1:],
+			currentTotalPeers:currentTotalPeers,
+		}
 
-		go NewLeech(infoHash, &peer, ms.PeerID, LeechEventHandlers{
+		go NewLeech(infoHash, &peer, currentTotalPeers, ms.PeerID, LeechEventHandlers{
 			OnSuccess: ms.flush,
 			OnError:   ms.onLeechError,
 		}).Do(time.Now().Add(ms.deadline))
@@ -148,15 +160,15 @@ func (ms *Sink) flush(result Metadata) {
 		return
 	}
 
-	ms.drain <- result
 	// Delete the infoHash from ms.incomingInfoHashes ONLY AFTER once we've flushed the
 	// metadata!
 	ms.incomingInfoHashesMx.Lock()
 	defer ms.incomingInfoHashesMx.Unlock()
 
-	var infoHash [20]byte
-	copy(infoHash[:], result.InfoHash)
-	delete(ms.incomingInfoHashes, infoHash)
+	result.CurrentTotalPeers = ms.incomingInfoHashes[result.InfoHash].currentTotalPeers
+	delete(ms.incomingInfoHashes, result.InfoHash)
+
+	ms.drain <- result
 }
 
 func (ms *Sink) onLeechError(infoHash [20]byte, err error) {
@@ -165,10 +177,11 @@ func (ms *Sink) onLeechError(infoHash [20]byte, err error) {
 	ms.incomingInfoHashesMx.Lock()
 	defer ms.incomingInfoHashesMx.Unlock()
 
-	if len(ms.incomingInfoHashes[infoHash]) > 0 {
-		peer := ms.incomingInfoHashes[infoHash][0]
-		ms.incomingInfoHashes[infoHash] = ms.incomingInfoHashes[infoHash][1:]
-		go NewLeech(infoHash, &peer, ms.PeerID, LeechEventHandlers{
+	ihToSink := ms.incomingInfoHashes[infoHash]
+	if len(ihToSink.addresses) > 0 {
+		peer := ihToSink.addresses[0]
+		ihToSink.addresses = ihToSink.addresses[1:]
+		go NewLeech(infoHash, &peer, ihToSink.currentTotalPeers, ms.PeerID, LeechEventHandlers{
 			OnSuccess: ms.flush,
 			OnError:   ms.onLeechError,
 		}).Do(time.Now().Add(ms.deadline))
