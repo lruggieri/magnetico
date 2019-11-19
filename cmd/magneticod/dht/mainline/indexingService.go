@@ -133,9 +133,11 @@ func (is *IndexingService) index() {
 
 func (is *IndexingService) bootstrap() {
 	bootstrappingNodes := []string{
-		"router.bittorrent.com:6881",
-		"dht.transmissionbt.com:6881",
-		"dht.libtorrent.org:25401",
+		"router.bittorrent.com:6881", //US
+		"dht.transmissionbt.com:6881", //FR
+		"dht.libtorrent.org:25401", //US
+
+		"router.utorrent.com:6881", //Iceland
 	}
 
 	zap.L().Info("Bootstrapping as routing table is empty...")
