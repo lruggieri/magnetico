@@ -39,6 +39,9 @@ type Database interface {
 	GetTorrent(infoHash []byte) (*TorrentMetadata, error)
 	GetFiles(infoHash []byte) ([]File, error)
 	GetStatistics(from string, n uint) (*Statistics, error)
+
+	// Check if the connection to the database still holds
+	IsConnected() bool
 }
 
 //implements only a subset (the read functions) of Database

@@ -118,6 +118,21 @@ func main() {
 			if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.CurrentTotalPeers); err != nil {
 				zap.L().Error("Could not add new torrent to the database",
 					util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
+				//now we can check if the error is due to the DB being no longer connected (connection dropped or such)
+				for{
+					if !database.IsConnected(){
+						tempDB, err := persistence.MakeDatabase(opFlags.DatabaseURL, logger)
+						if err != nil {
+							logger.Sugar().Warn("Could not re-open the database at `%s`", opFlags.DatabaseURL, zap.Error(err))
+						}else{
+							database = tempDB
+							break
+						}
+					}else{
+						break //not a connection error, no need to reconnect
+					}
+					time.Sleep(1*time.Second) //sleep until next connection retry
+				}
 			}else{
 				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
 			}

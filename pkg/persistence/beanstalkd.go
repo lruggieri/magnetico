@@ -42,6 +42,14 @@ type beanstalkd struct {
 	WriteOnlyDatabase
 	bsQueue *gobeanstalk.Conn
 }
+//uses ListTubes() as a way to understand if the connection still holds
+func (s *beanstalkd) IsConnected() bool{
+	_, err := s.bsQueue.ListTubes()
+	if err != nil && strings.Contains(strings.ToLower(err.Error()),"broken pipe"){
+		return false
+	}
+	return true
+}
 
 func (s *beanstalkd) Engine() databaseEngine {
 	s.kind = Beanstalkd

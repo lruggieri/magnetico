@@ -22,6 +22,7 @@ type sqlite3Database struct {
 	conn *sql.DB
 }
 
+
 func makeSqlite3Database(url_ *url.URL) (Database, error) {
 	db := new(sqlite3Database)
 
@@ -70,6 +71,14 @@ func makeSqlite3Database(url_ *url.URL) (Database, error) {
 	}
 
 	return db, nil
+}
+
+func (db *sqlite3Database) IsConnected() bool{
+	err := db.conn.Ping()
+	if err != nil{
+		return false
+	}
+	return true
 }
 
 func (db *sqlite3Database) Engine() databaseEngine {

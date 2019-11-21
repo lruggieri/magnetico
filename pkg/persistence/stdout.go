@@ -19,6 +19,10 @@ type stdout struct {
 	WriteOnlyDatabase
 	encoder *json.Encoder
 }
+//stdout is always connected
+func (s *stdout) IsConnected() bool{
+	return true
+}
 
 func (s *stdout) Engine() databaseEngine {
 	s.kind = Stdout
