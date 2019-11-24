@@ -62,7 +62,7 @@ func (s *beanstalkd) DoesTorrentExist(infoHash []byte) (bool, error) {
 	return false, nil
 }
 
-func (s *beanstalkd) AddNewTorrent(infoHash []byte, name string, files []File, totalPeers int) error {
+func (s *beanstalkd) AddNewTorrent(infoHash []byte, name string, files []File, peers map[string]int64) error {
 
 	sts := SimpleTorrentSummary{
 		InfoHash: hex.EncodeToString(infoHash),
@@ -73,7 +73,7 @@ func (s *beanstalkd) AddNewTorrent(infoHash []byte, name string, files []File, t
 		SimpleTorrentSummary: &sts,
 		TotalSize:sts.GetTotalSize(),
 		LastDiscovered:time.Now().Unix(),
-		TotalPeers:totalPeers,
+		TotalPeers:peers,
 	})
 
 	if err != nil {

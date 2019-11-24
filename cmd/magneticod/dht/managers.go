@@ -17,7 +17,6 @@ type Service interface {
 type Result interface {
 	InfoHash() [20]byte
 	PeerAddrs() []net.TCPAddr
-	CurrentTotalPeers() int
 }
 
 type Manager struct {

@@ -30,12 +30,12 @@ type Metadata struct {
 	// Files must be populated for both single-file and multi-file torrents!
 	Files []persistence.File
 
-	CurrentTotalPeers int
+	Peers map[string]int64
 }
 
 type InfoHashToSink struct{
 	addresses []net.TCPAddr
-	currentTotalPeers int
+	originalAddresses map[string]int64 // peer ==> discoveredTimeUnixNano
 }
 
 type Sink struct {
@@ -136,7 +136,11 @@ func (ms *Sink) Sink(res dht.Result) {
 
 	infoHash := res.InfoHash()
 	peerAddrs := res.PeerAddrs()
-	currentTotalPeers := res.CurrentTotalPeers()
+	originalAddresses := make(map[string]int64, len(peerAddrs))
+	for _,peer := range peerAddrs{
+		//originalAddresses[peer.IP.String()+":"+strconv.Itoa(peer.Port)] = time.Now().UnixNano() //use Nano for precision
+		originalAddresses[peer.String()] = time.Now().UnixNano() //use Nano for precision
+	}
 
 	if _, exists := ms.incomingInfoHashes[infoHash]; exists {
 		ms.stats.AddRequestType("existingInfohash")
@@ -146,10 +150,10 @@ func (ms *Sink) Sink(res dht.Result) {
 		peer := peerAddrs[0]
 		ms.incomingInfoHashes[infoHash] = &InfoHashToSink{
 			addresses:peerAddrs[1:],
-			currentTotalPeers:currentTotalPeers,
+			originalAddresses:originalAddresses,
 		}
 
-		go NewLeech(infoHash, &peer, currentTotalPeers, ms.PeerID, LeechEventHandlers{
+		go NewLeech(infoHash, &peer, originalAddresses, ms.PeerID, LeechEventHandlers{
 			OnSuccess: ms.flush,
 			OnError:   ms.onLeechError,
 		}).Do(time.Now().Add(ms.deadline))
@@ -182,7 +186,7 @@ func (ms *Sink) flush(result Metadata) {
 	ms.incomingInfoHashesMx.Lock()
 	defer ms.incomingInfoHashesMx.Unlock()
 
-	result.CurrentTotalPeers = ms.incomingInfoHashes[result.InfoHash].currentTotalPeers
+	result.Peers = ms.incomingInfoHashes[result.InfoHash].originalAddresses
 	delete(ms.incomingInfoHashes, result.InfoHash)
 
 	ms.drain <- result
@@ -199,7 +203,7 @@ func (ms *Sink) onLeechError(infoHash [20]byte, err error) {
 	if len(ihToSink.addresses) > 0 {
 		peer := ihToSink.addresses[0]
 		ihToSink.addresses = ihToSink.addresses[1:]
-		go NewLeech(infoHash, &peer, ihToSink.currentTotalPeers, ms.PeerID, LeechEventHandlers{
+		go NewLeech(infoHash, &peer, ihToSink.originalAddresses, ms.PeerID, LeechEventHandlers{
 			OnSuccess: ms.flush,
 			OnError:   ms.onLeechError,
 		}).Do(time.Now().Add(ms.deadline))

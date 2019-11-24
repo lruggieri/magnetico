@@ -113,9 +113,8 @@ func main() {
 			} else if !exists {
 				metadataSink.Sink(result)
 			}
-
 		case md := <-metadataSink.Drain():
-			if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.CurrentTotalPeers); err != nil {
+			if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.Peers); err != nil {
 				zap.L().Error("Could not add new torrent to the database",
 					util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
 				//now we can check if the error is due to the DB being no longer connected (connection dropped or such)
@@ -136,7 +135,6 @@ func main() {
 			}else{
 				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
 			}
-
 		case <-interruptChan:
 			trawlingManager.Terminate()
 			stopped = true

@@ -66,7 +66,7 @@ func TestGetSeedersLeeches(t *testing.T){
 			Port:port,
 		}
 
-		metadata.NewLeech(infoHash, &addr, nodeID, metadata.LeechEventHandlers{
+		metadata.NewLeech(infoHash, &addr, 10, nodeID, metadata.LeechEventHandlers{
 			OnSuccess: func(mtd metadata.Metadata){
 				fmt.Println("===================================================== WOW!")
 			},
@@ -164,7 +164,7 @@ func TestCheckSeeder(t *testing.T){
 
 	//no get_peer response
 	hastString := "d73347cd7d2dfcbd23e50d585e68dcd37fe52bbe"
-	ipPortString := "39.97.119.32:39939"
+	ipPortString := "dht.libtorrent.org:25401"
 
 
 	/*
@@ -229,7 +229,7 @@ func TestCheckSeeder(t *testing.T){
 
 	retry := 1
 	for i := 0 ; i < retry ; i++{
-		metadata.NewLeech(infohash, tcpAddr, myId, metadata.LeechEventHandlers{
+		metadata.NewLeech(infohash, tcpAddr, 20, myId, metadata.LeechEventHandlers{
 			OnSuccess: func(mtd metadata.Metadata){
 				fmt.Println("===================================================== Seed responded to metadata request")
 			},
@@ -237,6 +237,68 @@ func TestCheckSeeder(t *testing.T){
 				fmt.Println("error:",err)
 			},
 		}).Do(time.Now().Add(5*time.Second))
+	}
+}
+
+func TestFindNodes(t *testing.T){
+
+	//no get_peer response
+	hastString := "d73347cd7d2dfcbd23e50d585e68dcd37fe52bbe"
+	ipPortString := "tox.initramfs.io:33445"
+
+
+	//udpAddr := &net.UDPAddr{IP: net.ParseIP(ipString),Port:port}
+	udpAddr,err := net.ResolveUDPAddr("udp", ipPortString)
+	if err != nil{
+		t.Error(err)
+		t.FailNow()
+	}
+
+	hashToLookFor, err := hex.DecodeString(hastString)
+	if err != nil{
+		t.Error(err)
+		t.FailNow()
+	}
+	var infohash [20]byte
+	copy(infohash[:],hashToLookFor)
+
+	myId := make([]byte, 20)
+
+
+	msg := mainline.NewGetPeersQuery(myId, hashToLookFor)
+	identifier := uint16BE(1)
+	msg.T = identifier[:]
+	response := make(chan bool)
+	protocol := mainline.NewProtocol(
+		"0.0.0.0:0",
+		mainline.ProtocolEventHandlers{
+			OnSampleInfohashesResponse:func(message *mainline.Message, addr *net.UDPAddr){
+				fmt.Println("INFO_HASHES RESPONSE")
+				response <- true
+			},
+			OnFindNodeResponse: func(message *mainline.Message, addr *net.UDPAddr) {
+				fmt.Println("FIND_NODE RESPONSE")
+				fmt.Println(message.R.BFsd)
+				fmt.Println(message.R.BFpe)
+				response <- true
+			},
+			OnGetPeersResponse: func(message *mainline.Message, addr *net.UDPAddr) {
+				fmt.Println("GET_PEERS RESPONSE ")
+				fmt.Println(message.R.BFsd)
+				fmt.Println(message.R.BFpe)
+				response <- true
+			},
+		},)
+	protocol.Start()
+
+	protocol.SendMessage(mainline.NewFindNodeQuery(myId,make([]byte,20)), udpAddr)
+
+
+
+	fmt.Println("waiting response...")
+	select {
+	case <-response:{fmt.Println("got response")}
+	case <-time.Tick(5*time.Second):{fmt.Println("timeout")}
 	}
 }
 
