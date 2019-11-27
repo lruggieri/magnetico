@@ -45,7 +45,7 @@ type Sink struct {
 	drain       chan Metadata
 
 	incomingInfoHashes   map[mainline.Infohash]*InfoHashToSink
-	incomingInfoHashesMx sync.Mutex
+	incomingInfoHashesMx sync.RWMutex
 
 	terminated  bool
 	termination chan interface{}
@@ -105,9 +105,9 @@ func NewSink(deadline time.Duration, maxNLeeches int) *Sink {
 	go ms.printStats()
 	go func() {
 		for range time.Tick(deadline) {
-			ms.incomingInfoHashesMx.Lock()
+			ms.incomingInfoHashesMx.RLock()
 			l := len(ms.incomingInfoHashes)
-			ms.incomingInfoHashesMx.Unlock()
+			ms.incomingInfoHashesMx.RUnlock()
 			zap.L().Info("Sink status",
 				zap.Int("activeLeeches", l),
 				zap.Int("nDeleted", ms.deleted),
@@ -241,6 +241,8 @@ type sinkStats struct {
 	drained int
 }
 func(ss *sinkStats) Reset(){
+	//DO NOT LOCK (called in an already locked function)
+
 	ss.requestTotal = 0
 	ss.sunkTotal = 0
 	ss.drained = 0
