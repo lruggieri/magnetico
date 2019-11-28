@@ -136,6 +136,7 @@ func main() {
 				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
 			}
 		case <-interruptChan:
+			zap.L().Warn("Got interrupt request!")
 			trawlingManager.Terminate()
 			stopped = true
 		}

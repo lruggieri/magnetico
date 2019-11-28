@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/boramalper/magnetico/cmd/magneticod/dht/mainline"
 	"math/rand"
 	"net"
@@ -105,9 +106,11 @@ func NewSink(deadline time.Duration, maxNLeeches int) *Sink {
 	go ms.printStats()
 	go func() {
 		for range time.Tick(deadline) {
+			fmt.Println("GET lock incomingInfoHashesMx for Sink status")
 			ms.incomingInfoHashesMx.RLock()
 			l := len(ms.incomingInfoHashes)
 			ms.incomingInfoHashesMx.RUnlock()
+			fmt.Println("RELEASE lock incomingInfoHashesMx for Sink status")
 			zap.L().Info("Sink status",
 				zap.Int("activeLeeches", l),
 				zap.Int("nDeleted", ms.deleted),
