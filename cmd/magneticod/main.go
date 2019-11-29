@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"github.com/boramalper/magnetico/cmd/magneticod/dht/mainline"
 	"math/rand"
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -92,6 +94,12 @@ func main() {
 	// Handle Ctrl-C gracefully.
 	interruptChan := make(chan os.Signal, 1)
 	signal.Notify(interruptChan, os.Interrupt)
+	mainContext, mainCancel := context.WithCancel(context.Background())
+	go func (){
+		<-interruptChan
+		zap.L().Warn("Got interrupt request!")
+		mainCancel()
+	}()
 
 	database, err := persistence.MakeDatabase(opFlags.DatabaseURL, logger)
 	if err != nil {
@@ -101,46 +109,66 @@ func main() {
 	trawlingManager := dht.NewManager(opFlags.IndexerAddrs, opFlags.IndexerInterval, opFlags.IndexerMaxNeighbors)
 	metadataSink := metadata.NewSink(5*time.Second, opFlags.LeechMaxN)
 
-	// The Event Loop
-	for stopped := false; !stopped; {
-		select {
-		case result := <-trawlingManager.Output():
-			infoHash := result.InfoHash()
-			zap.L().Debug("Trawled!", util.HexField("infoHash", infoHash[:]))
-			exists, err := database.DoesTorrentExist(infoHash[:])
-			if err != nil {
-				zap.L().Fatal("Could not check whether torrent exists!", zap.Error(err))
-			} else if !exists {
-				metadataSink.Sink(result)
-			}
-		case md := <-metadataSink.Drain():
-			if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.Peers); err != nil {
-				zap.L().Error("Could not add new torrent to the database",
-					util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
-				//now we can check if the error is due to the DB being no longer connected (connection dropped or such)
-				for{
-					if !database.IsConnected(){
-						tempDB, err := persistence.MakeDatabase(opFlags.DatabaseURL, logger)
-						if err != nil {
-							logger.Sugar().Warn("Could not re-open the database at `%s`", opFlags.DatabaseURL, zap.Error(err))
-						}else{
-							database = tempDB
-							break
-						}
-					}else{
-						break //not a connection error, no need to reconnect
-					}
-					time.Sleep(1*time.Second) //sleep until next connection retry
+	var mainGroup sync.WaitGroup
+
+	// The Trawling Routine
+	mainGroup.Add(1)
+	go func(){
+		for stopped := false; !stopped;{
+			select{
+			case result := <-trawlingManager.Output():
+				infoHash := result.InfoHash()
+				zap.L().Debug("Trawled!", util.HexField("infoHash", infoHash[:]))
+				exists, err := database.DoesTorrentExist(infoHash[:])
+				if err != nil {
+					zap.L().Fatal("Could not check whether torrent exists!", zap.Error(err))
+				} else if !exists {
+					metadataSink.Sink(result)
 				}
-			}else{
-				zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
+			case <-mainContext.Done():{
+				stopped = true
 			}
-		case <-interruptChan:
-			zap.L().Warn("Got interrupt request!")
-			trawlingManager.Terminate()
-			stopped = true
+			}
 		}
-	}
+		mainGroup.Done()
+	}()
+
+	// The Sink Routine
+	mainGroup.Add(1)
+	go func(){
+		for stopped := false; !stopped;{
+			select{
+			case md := <-metadataSink.Drain():
+				if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.Peers); err != nil {
+					zap.L().Error("Could not add new torrent to the database",
+						util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
+					//now we can check if the error is due to the DB being no longer connected (connection dropped or such)
+					for{
+						if !database.IsConnected(){
+							tempDB, err := persistence.MakeDatabase(opFlags.DatabaseURL, logger)
+							if err != nil {
+								logger.Sugar().Warn("Could not re-open the database at `%s`", opFlags.DatabaseURL, zap.Error(err))
+							}else{
+								database = tempDB
+								break
+							}
+						}else{
+							break //not a connection error, no need to reconnect
+						}
+						time.Sleep(1*time.Second) //sleep until next connection retry
+					}
+				}else{
+					zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
+				}
+			case <-mainContext.Done():{
+				stopped = true
+			}
+			}
+		}
+		mainGroup.Done()
+	}()
+
+	mainGroup.Wait()
 
 	if err = database.Close(); err != nil {
 		zap.L().Error("Could not close database!", zap.Error(err))

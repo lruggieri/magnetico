@@ -107,9 +107,8 @@ func NewSink(deadline time.Duration, maxNLeeches int) *Sink {
 	go func() {
 		for range time.Tick(deadline) {
 			fmt.Println("GET lock incomingInfoHashesMx for Sink status")
-			ms.incomingInfoHashesMx.RLock()
+			ms.incomingInfoHashesMx.Lock()
 			l := len(ms.incomingInfoHashes)
-			ms.incomingInfoHashesMx.RUnlock()
 			fmt.Println("RELEASE lock incomingInfoHashesMx for Sink status")
 			zap.L().Info("Sink status",
 				zap.Int("activeLeeches", l),
@@ -117,6 +116,7 @@ func NewSink(deadline time.Duration, maxNLeeches int) *Sink {
 				zap.Int("drainQueue", len(ms.drain)),
 			)
 			ms.deleted = 0
+			ms.incomingInfoHashesMx.Unlock()
 		}
 	}()
 
@@ -192,7 +192,9 @@ func (ms *Sink) flush(result Metadata) {
 	result.Peers = ms.incomingInfoHashes[result.InfoHash].originalAddresses
 	delete(ms.incomingInfoHashes, result.InfoHash)
 
+	fmt.Println("Draining Result START")
 	ms.drain <- result
+	fmt.Println("Draining Result END")
 	ms.stats.AddDrained()
 }
 
