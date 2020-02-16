@@ -45,6 +45,32 @@ currently only SQLite 3 is supported. The database file can be found in:
 **magneticod** uses write-ahead logging (WAL) for its database, so there might be multiple
 files while it is operating, but ``database.sqlite3`` is *the database*.
 
+### As a service (on Linux)
+Create a service file `/lib/systemd/system/magneticod.service` (or equivalent on your system) like
+```
+[Unit]
+Description=Magneticod service.
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Nice=-10
+Restart=always
+RestartSec=30
+LimitNOFILE=65536
+User=myUser
+Group=wheel (or equivalent sudo group in your system)
+
+#starting service with sh. logging to specific files
+ExecStart=/usr/bin/sh -c 'exec path/to/startMagneticod.sh &>path/to/log/folder/service_$$(date +%%Y-%%m-%%d_%%H-%%M-%%S)_all.log'
+
+
+
+StartLimitInterval=0
+```
+and then start the service with `sudo systemctl start magneticod.service`.
+
 ### Using the Docker Image
 You need to mount
 
