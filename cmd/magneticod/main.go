@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/boramalper/magnetico/cmd/magneticod/dht/mainline"
 	"math/rand"
 	"net"
@@ -158,6 +159,7 @@ func main() {
 						time.Sleep(1*time.Second) //sleep until next connection retry
 					}
 				}else{
+					fmt.Println(md.CrawlerIP)
 					zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
 				}
 			case <-mainContext.Done():{

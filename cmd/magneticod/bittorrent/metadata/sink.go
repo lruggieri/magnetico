@@ -31,6 +31,7 @@ type Metadata struct {
 	// Files must be populated for both single-file and multi-file torrents!
 	Files []persistence.File
 
+	CrawlerIP string
 	Peers map[string]int64
 }
 
@@ -192,9 +193,7 @@ func (ms *Sink) flush(result Metadata) {
 	result.Peers = ms.incomingInfoHashes[result.InfoHash].originalAddresses
 	delete(ms.incomingInfoHashes, result.InfoHash)
 
-	fmt.Println("Draining Result START")
 	ms.drain <- result
-	fmt.Println("Draining Result END")
 	ms.stats.AddDrained()
 }
 

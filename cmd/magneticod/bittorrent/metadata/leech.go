@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
+	"github.com/boramalper/magnetico/pkg/util"
 	"io"
 	"math"
 	"net"
@@ -426,7 +427,10 @@ func (l *Leech) Do(deadline time.Time) {
 	}
 
 	//fmt.Println("FROM",l.peerAddr,"HASH",string(hex.EncodeToString(l.infoHash[:])))
-
+	myIP, err := util.GetMyIP()
+	if err != nil {
+		zap.L().Debug("cannot get local IP: "+err.Error())
+	}
 	l.ev.OnSuccess(Metadata{
 		InfoHash:     l.infoHash,
 		Name:         info.Name,
@@ -434,6 +438,7 @@ func (l *Leech) Do(deadline time.Time) {
 		DiscoveredOn: time.Now().Unix(),
 		Files:        files,
 		Peers:        l.originalPeers,
+		CrawlerIP:    myIP,
 	})
 }
 
