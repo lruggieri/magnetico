@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/boramalper/magnetico/cmd/magneticod/dht/mainline"
 	"math/rand"
 	"net"
@@ -140,7 +139,7 @@ func main() {
 		for stopped := false; !stopped;{
 			select{
 			case md := <-metadataSink.Drain():
-				if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.Peers); err != nil {
+				if err := database.AddNewTorrent(md.InfoHash[:], md.Name, md.Files, md.Peers, md.CrawlerIP); err != nil {
 					zap.L().Error("Could not add new torrent to the database",
 						util.HexField("infohash", md.InfoHash[:]), zap.Error(err))
 					//now we can check if the error is due to the DB being no longer connected (connection dropped or such)
@@ -159,8 +158,10 @@ func main() {
 						time.Sleep(1*time.Second) //sleep until next connection retry
 					}
 				}else{
-					fmt.Println(md.CrawlerIP)
-					zap.L().Info("Fetched!", zap.String("name", md.Name), util.HexField("infoHash", md.InfoHash[:]))
+					zap.L().Info("Fetched!",
+						zap.String("name", md.Name),
+						util.HexField("infoHash", md.InfoHash[:]),
+						zap.String("myIP",md.CrawlerIP))
 				}
 			case <-mainContext.Done():{
 				stopped = true

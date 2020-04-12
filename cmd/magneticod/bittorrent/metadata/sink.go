@@ -31,7 +31,7 @@ type Metadata struct {
 	// Files must be populated for both single-file and multi-file torrents!
 	Files []persistence.File
 
-	CrawlerIP string
+	CrawlerIP string //this machine IP. It's useful to track which torrent has been fetched by which magneticod crawler
 	Peers map[string]int64
 }
 

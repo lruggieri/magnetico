@@ -12,7 +12,7 @@ import (
 type Database interface {
 	Engine() databaseEngine
 	DoesTorrentExist(infoHash []byte) (bool, error)
-	AddNewTorrent(infoHash []byte, name string, files []File, peers map[string]int64) error
+	AddNewTorrent(infoHash []byte, name string, files []File, peers map[string]int64, crawlerIP string) error
 	Close() error
 
 	// GetNumberOfTorrents returns the number of torrents saved in the database. Might be an
@@ -145,6 +145,7 @@ type ExpandedTorrentSummary struct{
 	TotalSize uint64 `json:"totalSize"`
 	LastDiscovered int64 `json:"lastDiscovered"`
 	TotalPeers map[string]int64 `json:"peers"`
+	CrawlerIP string `json:"crawlerIP"`
 }
 
 func (tm *TorrentMetadata) MarshalJSON() ([]byte, error) {
